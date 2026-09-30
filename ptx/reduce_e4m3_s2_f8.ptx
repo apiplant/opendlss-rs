@@ -1,0 +1,55 @@
+.version 8.7
+.target sm_89
+.address_size 64
+
+.visible .entry reduce_e4m3_s2_f8(.param .u64 pPartial, .param .u64 pOut, .param .u64 pOut16, .param .u32 rows, .param .u32 N, .param .u32 splitStride, .param .u32 outputStride, .param .u32 outputColumnOffset)
+.maxntid 256, 1, 1
+{
+  .reg .b64 %rd<9>;
+  .reg .b32 %r<35>;
+  .reg .pred %p<1>;
+
+  ld.param.u64 %rd0, [pPartial];
+  ld.param.u64 %rd1, [pOut];
+  ld.param.u64 %rd2, [pOut16];
+  ld.param.u32 %r0, [rows];
+  ld.param.u32 %r1, [N];
+  ld.param.u32 %r2, [splitStride];
+  ld.param.u32 %r3, [outputStride];
+  ld.param.u32 %r4, [outputColumnOffset];
+  mov.u32 %r5, %tid.x;
+  mov.u32 %r6, %ctaid.x;
+  shl.b32 %r7, %r6, 8;
+  add.u32 %r8, %r5, %r7;
+  shr.u32 %r9, %r1, 3;
+  div.u32 %r10, %r8, %r9;
+  mul.lo.u32 %r11, %r10, %r9;
+  sub.u32 %r12, %r8, %r11;
+  shl.b32 %r13, %r12, 3;
+  setp.lt.u32 %p0, %r10, %r0;
+  @!%p0 bra END_1;
+  mul.lo.u32 %r14, %r10, %r1;
+  add.u32 %r15, %r14, %r13;
+  shl.b32 %r16, %r15, 1;
+  cvt.u64.u32 %rd3, %r16;
+  add.u64 %rd4, %rd0, %rd3;
+  ld.global.cg.v4.b32 {%r17, %r18, %r19, %r20}, [%rd4];
+  mov.u32 %r25, 2;
+  mul.lo.u32 %r26, %r2, %r25;
+  cvt.u64.u32 %rd5, %r26;
+  add.u64 %rd6, %rd4, %rd5;
+  ld.global.cg.v4.b32 {%r21, %r22, %r23, %r24}, [%rd6];
+  add.rn.f16x2 %r27, %r17, %r21;
+  add.rn.f16x2 %r28, %r18, %r22;
+  add.rn.f16x2 %r29, %r19, %r23;
+  add.rn.f16x2 %r30, %r20, %r24;
+  mul.lo.u32 %r31, %r10, %r3;
+  add.u32 %r32, %r4, %r13;
+  add.u32 %r33, %r31, %r32;
+  shl.b32 %r34, %r33, 1;
+  cvt.u64.u32 %rd7, %r34;
+  add.u64 %rd8, %rd2, %rd7;
+  st.global.v4.b32 [%rd8], {%r27, %r28, %r29, %r30};
+  END_1:
+  ret;
+}

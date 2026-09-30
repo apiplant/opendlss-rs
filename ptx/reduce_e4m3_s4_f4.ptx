@@ -1,0 +1,79 @@
+.version 8.7
+.target sm_89
+.address_size 64
+
+.visible .entry reduce_e4m3_s4_f4(.param .u64 pPartial, .param .u64 pOut, .param .u64 pOut16, .param .u32 rows, .param .u32 N, .param .u32 splitStride, .param .u32 outputStride, .param .u32 outputColumnOffset)
+.maxntid 256, 1, 1
+{
+  .reg .b64 %rd<13>;
+  .reg .b32 %r<56>;
+  .reg .pred %p<1>;
+  .reg .b16 %h<4>;
+
+  ld.param.u64 %rd0, [pPartial];
+  ld.param.u64 %rd1, [pOut];
+  ld.param.u64 %rd2, [pOut16];
+  ld.param.u32 %r0, [rows];
+  ld.param.u32 %r1, [N];
+  ld.param.u32 %r2, [splitStride];
+  ld.param.u32 %r3, [outputStride];
+  ld.param.u32 %r4, [outputColumnOffset];
+  mov.u32 %r5, %tid.x;
+  mov.u32 %r6, %ctaid.x;
+  shl.b32 %r7, %r6, 8;
+  add.u32 %r8, %r5, %r7;
+  shr.u32 %r9, %r1, 3;
+  div.u32 %r10, %r8, %r9;
+  mul.lo.u32 %r11, %r10, %r9;
+  sub.u32 %r12, %r8, %r11;
+  shl.b32 %r13, %r12, 3;
+  setp.lt.u32 %p0, %r10, %r0;
+  @!%p0 bra END_1;
+  mul.lo.u32 %r14, %r10, %r1;
+  add.u32 %r15, %r14, %r13;
+  shl.b32 %r16, %r15, 1;
+  cvt.u64.u32 %rd3, %r16;
+  add.u64 %rd4, %rd0, %rd3;
+  ld.global.cg.v4.b32 {%r17, %r18, %r19, %r20}, [%rd4];
+  mov.u32 %r25, 2;
+  mul.lo.u32 %r26, %r2, %r25;
+  cvt.u64.u32 %rd5, %r26;
+  add.u64 %rd6, %rd4, %rd5;
+  ld.global.cg.v4.b32 {%r21, %r22, %r23, %r24}, [%rd6];
+  add.rn.f16x2 %r27, %r17, %r21;
+  add.rn.f16x2 %r28, %r18, %r22;
+  add.rn.f16x2 %r29, %r19, %r23;
+  add.rn.f16x2 %r30, %r20, %r24;
+  mov.u32 %r35, 4;
+  mul.lo.u32 %r36, %r2, %r35;
+  cvt.u64.u32 %rd7, %r36;
+  add.u64 %rd8, %rd4, %rd7;
+  ld.global.cg.v4.b32 {%r31, %r32, %r33, %r34}, [%rd8];
+  add.rn.f16x2 %r37, %r27, %r31;
+  add.rn.f16x2 %r38, %r28, %r32;
+  add.rn.f16x2 %r39, %r29, %r33;
+  add.rn.f16x2 %r40, %r30, %r34;
+  mov.u32 %r45, 6;
+  mul.lo.u32 %r46, %r2, %r45;
+  cvt.u64.u32 %rd9, %r46;
+  add.u64 %rd10, %rd4, %rd9;
+  ld.global.cg.v4.b32 {%r41, %r42, %r43, %r44}, [%rd10];
+  add.rn.f16x2 %r47, %r37, %r41;
+  add.rn.f16x2 %r48, %r38, %r42;
+  add.rn.f16x2 %r49, %r39, %r43;
+  add.rn.f16x2 %r50, %r40, %r44;
+  mul.lo.u32 %r51, %r10, %r3;
+  add.u32 %r52, %r4, %r13;
+  add.u32 %r53, %r51, %r52;
+  cvt.rn.satfinite.e4m3x2.f16x2 %h0, %r47;
+  cvt.rn.satfinite.e4m3x2.f16x2 %h1, %r48;
+  cvt.rn.satfinite.e4m3x2.f16x2 %h2, %r49;
+  cvt.rn.satfinite.e4m3x2.f16x2 %h3, %r50;
+  mov.b32 %r54, {%h0, %h1};
+  mov.b32 %r55, {%h2, %h3};
+  cvt.u64.u32 %rd11, %r53;
+  add.u64 %rd12, %rd1, %rd11;
+  st.global.v2.b32 [%rd12], {%r54, %r55};
+  END_1:
+  ret;
+}
