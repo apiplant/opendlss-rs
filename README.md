@@ -1,4 +1,4 @@
-# opendlss-nr (Rust/Linux)
+# opendlss-rs (Rust/Linux)
 
 Rust host-side port of the model format, geometry rules, and Vulkan capability
 gate used by `OpenDLSS-NR` project. It is intended to make the
