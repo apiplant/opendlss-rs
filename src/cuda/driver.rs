@@ -3,7 +3,7 @@
 
 use anyhow::{Context as _, Result, bail};
 use std::{
-    ffi::{CString, c_void},
+    ffi::{CString, c_char, c_void},
     sync::Arc,
 };
 
@@ -51,9 +51,9 @@ macro_rules! driver_api {
 
 driver_api! {
     cuInit: fn(u32);
-    cuGetErrorString: fn(CuResult, *mut *const i8);
+    cuGetErrorString: fn(CuResult, *mut *const c_char);
     cuDeviceGet: fn(*mut i32, i32);
-    cuDeviceGetName: fn(*mut i8, i32, i32);
+    cuDeviceGetName: fn(*mut c_char, i32, i32);
     cuDeviceGetAttribute: fn(*mut i32, i32, i32);
     cuDevicePrimaryCtxRetain: fn(*mut Handle, i32);
     cuCtxSetCurrent: fn(Handle);
@@ -69,7 +69,7 @@ driver_api! {
     cuMemsetD8Async: fn(DevicePtr, u8, usize, Handle);
     cuMemcpyDtoDAsync_v2: fn(DevicePtr, DevicePtr, usize, Handle);
     cuModuleLoadData: fn(*mut Handle, *const c_void);
-    cuModuleGetFunction: fn(*mut Handle, Handle, *const i8);
+    cuModuleGetFunction: fn(*mut Handle, Handle, *const c_char);
     cuFuncSetAttribute: fn(Handle, i32, i32);
     cuLaunchKernel: fn(Handle, u32, u32, u32, u32, u32, u32, u32, Handle, *mut *mut c_void, *mut *mut c_void);
     cuStreamCreate: fn(*mut Handle, u32);
@@ -95,7 +95,7 @@ impl Driver {
         if result == 0 {
             return Ok(());
         }
-        let mut message: *const i8 = std::ptr::null();
+        let mut message: *const c_char = std::ptr::null();
         unsafe { (self.api.cuGetErrorString)(result, &mut message) };
         let text = if message.is_null() {
             format!("error {result}")
@@ -130,7 +130,7 @@ impl Cuda {
             driver.check((api.cuInit)(0), "cuInit")?;
             let mut device = 0;
             driver.check((api.cuDeviceGet)(&mut device, 0), "no CUDA device")?;
-            let mut name = [0i8; 256];
+            let mut name = [0 as c_char; 256];
             driver.check(
                 (api.cuDeviceGetName)(name.as_mut_ptr(), 256, device),
                 "cuDeviceGetName",
