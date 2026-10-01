@@ -1,0 +1,13 @@
+Package: opendlss-rs
+Version: @VERSION@
+Section: utils
+Priority: optional
+Architecture: @ARCH@
+Depends: libvulkan1
+Maintainer: apiplant <releases@apiplant.com>
+Installed-Size: @INSTALLED_SIZE@
+Homepage: https://github.com/apiplant/opendlss-rs
+Description: Rust host and model tools for the OpenDLSS-NR neural renderer
+ opendlss-nr runs the OpenDLSS-NR network on an image through CUDA (when
+ the driver is present, loaded at run time) or wgpu (Vulkan, Metal), and
+ validates portable model directories. No model weights are bundled.

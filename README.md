@@ -197,3 +197,15 @@ dual-output contract, QKV, window attention and the projection with its
 seeded skip. It also covers block 70's phase-1 shifted window attention.
 Both currently pass bit for bit, against the reference with its norm fma
 corrected (bug 1).
+
+## Install
+
+Prebuilt packages (opendlss-nr) for macOS (Apple Silicon), Linux x86_64 and Linux arm64:
+
+```bash
+brew tap apiplant/tap && brew install apiplant/tap/opendlss-rs      # macOS, Linux
+sudo apt install opendlss-rs      # Debian/Ubuntu, after adding apt.apiplant.com
+sudo pacman -S opendlss-rs        # Arch, after adding apiplant.github.io/pacman
+```
+
+Setup commands for the apt and pacman repositories, the plain archives and the release process are in [`packaging/README.md`](packaging/README.md). Release archives are on the [releases page](https://github.com/apiplant/opendlss-rs/releases).

@@ -12,7 +12,7 @@ use opendlss_nr::{
 use std::path::PathBuf;
 
 #[derive(Parser)]
-#[command(about = "Linux host tools for OpenDLSS-NR")]
+#[command(version, about = "Linux host tools for OpenDLSS-NR")]
 struct Cli {
     #[command(subcommand)]
     command: Command,
