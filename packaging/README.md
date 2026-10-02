@@ -1,6 +1,6 @@
 # Packaging
 
-One package, `opendlss-rs`, carrying `opendlss-nr`.
+One package, `opendlss-rs`, carrying `opendlss`.
 The `packages`, `homebrew`, `apt` and `pacman` jobs in
 [`.github/workflows/release.yml`](../.github/workflows/release.yml) substitute
 the `@VERSION@`, `@SHA_*@` and `@ARCH@` placeholders with the tag's version and

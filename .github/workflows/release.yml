@@ -4,7 +4,7 @@ name: release
 #
 #   git tag v0.x.0 && git push origin v0.x.0
 #
-# That builds opendlss-nr for every supported platform,
+# That builds opendlss for every supported platform,
 # attaches the archives, checksums, and distro packages to the GitHub
 # release, and publishes the Homebrew formula and the apt and pacman repos.
 on:
@@ -39,15 +39,15 @@ jobs:
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-22.04
             args: "--bins"
-            bins: "opendlss-nr"
+            bins: "opendlss"
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-22.04-arm
             args: "--bins"
-            bins: "opendlss-nr"
+            bins: "opendlss"
           - target: aarch64-apple-darwin
             os: macos-14
             args: "--bins"
-            bins: "opendlss-nr"
+            bins: "opendlss"
     steps:
       - uses: actions/checkout@v4
 
@@ -123,7 +123,7 @@ jobs:
             local src="$prefix-${TAG}-$triple"
             local root="stage/$name-$arch"
 
-            for bin in opendlss-nr; do
+            for bin in opendlss; do
               install -Dm755 "$src/$bin" "$root/usr/bin/$bin"
             done
             install -Dm644 "$src/README.md" "$root/usr/share/doc/$name/README.md"
@@ -173,6 +173,7 @@ jobs:
             mkdir -p "$dir"
             sed \
               -e "s/@VERSION@/$version/g" \
+              -e "s/@ARCHIVE_PREFIX@/$prefix/g" \
               -e "s/$placeholder/$(sha256sum "$archive" | cut -d' ' -f1)/" \
               "packaging/pacman/$template" > "$dir/PKGBUILD"
 
@@ -223,7 +224,7 @@ jobs:
           fi
           deb="debs/opendlss-rs_${version}-1_amd64.deb"
           dpkg-deb --info "$deb"
-          for bin in opendlss-nr; do
+          for bin in opendlss; do
             dpkg-deb --contents "$deb" | grep -q "./usr/bin/$bin"
           done
           [ "$(dpkg-deb --field "debs/opendlss-rs_${version}-1_arm64.deb" Architecture)" = arm64 ]
@@ -232,7 +233,7 @@ jobs:
           # run — which is the check that matters: `--version` proves the
           # binaries survived the round trip.
           sudo dpkg -i "$deb" || sudo apt-get install -fy
-          for bin in opendlss-nr; do
+          for bin in opendlss; do
             "$bin" --version | grep -q "$crate_version"
           done
           sudo dpkg -r opendlss-rs
@@ -246,7 +247,7 @@ jobs:
               bsdtar -xOf \"\$pkg\" .PKGINFO | grep -qx 'pkgname = $1'
               bsdtar -xOf \"\$pkg\" .PKGINFO | grep -qx 'pkgver = $version-1'
               $2
-              for bin in opendlss-nr; do
+              for bin in opendlss; do
                 bsdtar -tf \"\$pkg\" | grep -qx \"usr/bin/\$bin\"
               done
             "
@@ -309,7 +310,7 @@ jobs:
             | Linux x86_64 | `opendlss-rs-${{ github.ref_name }}-x86_64-unknown-linux-gnu.tar.gz` |
             | Linux aarch64 | `opendlss-rs-${{ github.ref_name }}-aarch64-unknown-linux-gnu.tar.gz` |
 
-            Each archive holds `opendlss-nr` (macOS: `opendlss-nr`).
+            Each archive holds `opendlss` (macOS: `opendlss`).
 
             ## Debian packages
 

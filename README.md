@@ -9,13 +9,27 @@ with `VK_KHR_cooperative_matrix`, `VK_NV_cooperative_matrix2`,
 `VK_EXT_shader_float8`, and `VK_NV_cuda_kernel_launch`. `doctor` reports this
 requirement before attempting a run.
 
+## Setup
+
+The weights are not part of this repository or the packages. Once, with your own copy of NVIDIA's
+`nvngx_dlssnr.dll` (it is only read as data, never loaded or run):
+
+```bash
+opendlss setup                       # asks for the DLL path
+opendlss setup --dll /path/to/nvngx_dlssnr.dll
+```
+
+This extracts the model into `$XDG_CONFIG_HOME/opendlss/models/nr` (`~/.config/opendlss/models/nr`), verifies
+every stage hash, and every other command uses it by default. `--model DIR` points a command at another model
+directory; `opendlss setup --force` replaces an existing one.
+
 ```bash
 cargo run -- doctor
 cargo run -- portable-doctor
 cargo run -- cuda-doctor
-cargo run -- portable-load --model models/nr
+cargo run -- portable-load
 cargo run -- geometry --width 1920 --height 1080
-cargo run -- validate-model --model /path/to/exported/nr-model
+cargo run -- validate-model                   # or --model /path/to/exported/nr-model
 ```
 
 The model argument is a portable model directory containing `manifest.json`
@@ -198,9 +212,35 @@ seeded skip. It also covers block 70's phase-1 shifted window attention.
 Both currently pass bit for bit, against the reference with its norm fma
 corrected (bug 1).
 
+## Use as a library
+
+The crate is published as `opendlss-nr`; the library is `opendlss_nr`.
+
+```toml
+[dependencies]
+opendlss-nr = "0.1"
+```
+
+There is no `cuda` feature to enable: the CUDA backend's kernels ship as embedded PTX and the driver is
+loaded at run time, so the same build uses CUDA when an NVIDIA driver is present and falls back to wgpu
+(Vulkan, Metal, DX12) otherwise.
+
+```rust
+use opendlss_nr::{load_image, render, save_image, Backend, Conditioning, Model};
+
+let model = Model::load(opendlss_nr::config::model_dir().unwrap(), false)?;            // as written by `opendlss setup` (~/.config/opendlss/models/nr)
+let image = load_image("in.png".as_ref())?;
+let out = render(&model, &image, Conditioning::default(), Backend::Auto)?;
+println!("{} via {} in {:.1} ms", out.device, out.backend, out.frame_ms);
+save_image("out.png".as_ref(), &out.image)?;
+```
+
+`render` builds a network for the image's size, runs one frame and tears it down. To keep a network
+resident and run many frames, use `network::Network` (wgpu) or `cuda::network::CudaNetwork` directly.
+
 ## Install
 
-Prebuilt packages (opendlss-nr) for macOS (Apple Silicon), Linux x86_64 and Linux arm64:
+Prebuilt packages (the `opendlss` command) for macOS (Apple Silicon), Linux x86_64 and Linux arm64:
 
 ```bash
 brew tap apiplant/tap && brew install apiplant/tap/opendlss-rs      # macOS, Linux

@@ -23,6 +23,6 @@ options=('!strip' '!debug')
 
 package() {
   local src="$srcdir/opendlss-rs-v$pkgver-x86_64-unknown-linux-gnu"
-  install -Dm755 "$src/opendlss-nr" "$pkgdir/usr/bin/opendlss-nr"
+  install -Dm755 "$src/opendlss" "$pkgdir/usr/bin/opendlss"
   install -Dm644 "$src/README.md" "$pkgdir/usr/share/doc/$pkgname/README.md"
 }

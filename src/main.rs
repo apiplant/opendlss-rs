@@ -1,7 +1,7 @@
 use anyhow::{Context, Result, bail};
 use clap::{Parser, Subcommand};
 use opendlss_nr::{
-    cuda, dll,
+    config, cuda, dll,
     geometry::Geometry,
     model::Model,
     network::{self, Conditioning, Network},
@@ -12,7 +12,7 @@ use opendlss_nr::{
 use std::path::PathBuf;
 
 #[derive(Parser)]
-#[command(version, about = "Linux host tools for OpenDLSS-NR")]
+#[command(name = "opendlss", version, about = "Host tools for OpenDLSS-NR: run the network on images, validate models")]
 struct Cli {
     #[command(subcommand)]
     command: Command,
@@ -27,8 +27,9 @@ enum Command {
     CudaDoctor,
     /// Upload a validated model to the portable GPU backend (no NVIDIA features required).
     PortableLoad {
+        /// Model directory (default: the one `opendlss setup` installed in the config directory).
         #[arg(long)]
-        model: PathBuf,
+        model: Option<PathBuf>,
     },
     /// Print the native-compatible padded field geometry.
     Geometry {
@@ -39,15 +40,17 @@ enum Command {
     },
     /// Validate a portable manifest and all staged model bytes.
     ValidateModel {
+        /// Model directory (default: the one `opendlss setup` installed in the config directory).
         #[arg(long)]
-        model: PathBuf,
+        model: Option<PathBuf>,
         #[arg(long)]
         skip_hashes: bool,
     },
     /// Run the network on an image: an 8-bit PNG/JPEG in, the re-rendered image out (same size).
     Process {
-        #[arg(long, default_value = "models/nr")]
-        model: PathBuf,
+        /// Model directory (default: the one `opendlss setup` installed in the config directory).
+        #[arg(long)]
+        model: Option<PathBuf>,
         #[arg(long, short)]
         input: PathBuf,
         #[arg(long, short)]
@@ -87,8 +90,9 @@ enum Command {
     /// Run one frame and write intermediate tensors (raw bytes, `<label>.bin`) for checking against a reference.
     #[command(hide = true)]
     DumpTensors {
-        #[arg(long, default_value = "models/nr")]
-        model: PathBuf,
+        /// Model directory (default: the one `opendlss setup` installed in the config directory).
+        #[arg(long)]
+        model: Option<PathBuf>,
         #[arg(long, short)]
         input: PathBuf,
         #[arg(long)]
@@ -100,8 +104,9 @@ enum Command {
     /// The CUDA backend's `dump-tensors`.
     #[command(hide = true)]
     CudaDumpTensors {
-        #[arg(long, default_value = "models/nr")]
-        model: PathBuf,
+        /// Model directory (default: the one `opendlss setup` installed in the config directory).
+        #[arg(long)]
+        model: Option<PathBuf>,
         #[arg(long, short)]
         input: PathBuf,
         #[arg(long)]
@@ -113,8 +118,9 @@ enum Command {
     /// (tools/ptx/qkv_debug.py) and write its debug words.
     #[command(hide = true)]
     CudaDebugQkv {
-        #[arg(long, default_value = "models/nr")]
-        model: PathBuf,
+        /// Model directory (default: the one `opendlss setup` installed in the config directory).
+        #[arg(long)]
+        model: Option<PathBuf>,
         #[arg(long, short)]
         input: PathBuf,
         #[arg(long)]
@@ -138,6 +144,16 @@ enum Command {
     NumericsSelftest {
         #[arg(long)]
         dir: PathBuf,
+    },
+    /// One-time setup: asks for your `nvngx_dlssnr.dll`, extracts the model from it (the DLL is only read as
+    /// data, never loaded) and installs it in the config directory, where every other command finds it.
+    Setup {
+        /// Path to `nvngx_dlssnr.dll`. Asked for when omitted.
+        #[arg(long)]
+        dll: Option<PathBuf>,
+        /// Replace a model that is already set up.
+        #[arg(long)]
+        force: bool,
     },
     /// Extract a portable model directory without loading or executing the DLL.
     ExtractDll {
@@ -194,7 +210,7 @@ fn main() -> Result<()> {
             cuda::CudaAvailability::Unavailable(reason) => println!("CUDA unavailable: {reason}"),
         },
         Command::PortableLoad { model: model_path } => {
-            let model = Model::load(model_path, true)?;
+            let model = Model::load(resolve_model(model_path)?, true)?;
             let device = pollster::block_on(portable::PortableDevice::request())?;
             portable::require_model_fits(&device, &model)?;
             let uploaded = device.upload_model(&model)?;
@@ -224,7 +240,7 @@ fn main() -> Result<()> {
             );
         }
         Command::ValidateModel { model, skip_hashes } => {
-            let model = Model::load(&model, !skip_hashes)?;
+            let model = Model::load(resolve_model(model)?, !skip_hashes)?;
             println!(
                 "valid: {} blocks, {} stages, {} tensors",
                 model.manifest.totals.block_count,
@@ -249,7 +265,7 @@ fn main() -> Result<()> {
             backend,
         } => {
             let image = network::load_image(&input)?;
-            let model = Model::load(&model, false)?;
+            let model = Model::load(resolve_model(model)?, false)?;
             let conditioning = Conditioning {
                 seed,
                 auto_mask,
@@ -361,7 +377,7 @@ fn main() -> Result<()> {
             tensors,
         } => {
             let image = network::load_image(&input)?;
-            let model = Model::load(&model, false)?;
+            let model = Model::load(resolve_model(model)?, false)?;
             let gpu = pollster::block_on(Gpu::request())?;
             let net = Network::new(
                 &gpu,
@@ -398,7 +414,7 @@ fn main() -> Result<()> {
             tensors,
         } => {
             let image = network::load_image(&input)?;
-            let model = Model::load(&model, false)?;
+            let model = Model::load(resolve_model(model)?, false)?;
             let cuda = opendlss_nr::cuda::driver::Cuda::new()?;
             let mut net = opendlss_nr::cuda::network::CudaNetwork::with_captures(
                 &cuda,
@@ -426,7 +442,7 @@ fn main() -> Result<()> {
             out,
         } => {
             let image = network::load_image(&input)?;
-            let model = Model::load(&model, false)?;
+            let model = Model::load(resolve_model(model)?, false)?;
             let cuda = opendlss_nr::cuda::driver::Cuda::new()?;
             let mut net = opendlss_nr::cuda::network::CudaNetwork::with_captures(
                 &cuda,
@@ -456,6 +472,7 @@ fn main() -> Result<()> {
             let gpu = pollster::block_on(Gpu::request())?;
             selftest::run(&gpu, &dir)?;
         }
+        Command::Setup { dll: dll_path, force } => setup(dll_path, force)?,
         Command::ExtractDll {
             dll: source,
             output,
@@ -467,6 +484,64 @@ fn main() -> Result<()> {
             );
         }
     }
+    Ok(())
+}
+
+/// The model directory to use: `--model`, else the one `opendlss setup` installed.
+fn resolve_model(explicit: Option<PathBuf>) -> Result<PathBuf> {
+    if let Some(dir) = explicit {
+        return Ok(dir);
+    }
+    let dir = config::model_dir().context("no config directory available (set $HOME or $XDG_CONFIG_HOME)")?;
+    if !dir.join("manifest.json").is_file() {
+        bail!("no model set up yet: run `opendlss setup`, or pass --model DIR");
+    }
+    Ok(dir)
+}
+
+fn setup(dll_path: Option<PathBuf>, force: bool) -> Result<()> {
+    use std::io::{BufRead, IsTerminal, Write};
+    let target = config::model_dir().context("no config directory available (set $HOME or $XDG_CONFIG_HOME)")?;
+    if target.join("manifest.json").is_file() && !force {
+        println!("A model is already set up in {}.\nRun `opendlss setup --force` to replace it.", target.display());
+        return Ok(());
+    }
+    let dll_path = match dll_path {
+        Some(path) => path,
+        None => {
+            if !std::io::stdin().is_terminal() {
+                bail!("pass --dll PATH (stdin is not a terminal, so there is nobody to ask)");
+            }
+            println!("OpenDLSS-NR needs the network weights from your own copy of nvngx_dlssnr.dll.");
+            println!("The DLL is only read as data (never loaded or run) and is not copied.\n");
+            print!("Path to nvngx_dlssnr.dll: ");
+            std::io::stdout().flush()?;
+            let mut line = String::new();
+            std::io::stdin().lock().read_line(&mut line)?;
+            config::expand_path(line.trim().trim_matches(|c| c == '"' || c == '\''))
+        }
+    };
+    if !dll_path.is_file() {
+        bail!("{} is not a file", dll_path.display());
+    }
+    if target.exists() {
+        std::fs::remove_dir_all(&target).with_context(|| format!("removing {}", target.display()))?;
+    }
+    if let Some(parent) = target.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let report = dll::extract_model(&dll_path, &target)?;
+    // Check what was written the way every later command will read it, hashes included.
+    let model = Model::load(&target, true).inspect_err(|_| {
+        let _ = std::fs::remove_dir_all(&target);
+    })?;
+    println!(
+        "Extracted {} tensors ({} MiB) to {}\nVerified {} stages. Try: opendlss process -i in.png -o out.png",
+        report.records,
+        report.packed_bytes >> 20,
+        target.display(),
+        model.manifest.stages.len()
+    );
     Ok(())
 }
 

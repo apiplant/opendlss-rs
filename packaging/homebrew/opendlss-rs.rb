@@ -28,11 +28,11 @@ class OpendlssRs < Formula
   end
 
   def install
-    bin.install "opendlss-nr"
+    bin.install "opendlss"
     doc.install "README.md"
   end
 
   test do
-    assert_match version.to_s, shell_output("#{bin}/opendlss-nr --version")
+    assert_match version.to_s, shell_output("#{bin}/opendlss --version")
   end
 end
