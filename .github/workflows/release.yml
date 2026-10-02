@@ -45,7 +45,7 @@ jobs:
             args: "--bins"
             bins: "opendlss"
           - target: aarch64-apple-darwin
-            os: macos-14
+            os: macos-15
             args: "--bins"
             bins: "opendlss"
     steps:
